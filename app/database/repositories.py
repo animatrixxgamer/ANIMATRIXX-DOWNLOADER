@@ -12,6 +12,7 @@ from app.database.models import (
     Administrator,
     ArchiveChannel,
     ArchivedMedia,
+    BotSetting,
     Series,
     User,
     utcnow,
@@ -205,6 +206,37 @@ async def list_channels(session: AsyncSession) -> Sequence[ArchiveChannel]:
     return (await session.scalars(select(ArchiveChannel).order_by(ArchiveChannel.title))).all()
 
 
+# ----------------------------------------------------------- bot settings
+async def get_setting(session: AsyncSession, key: str) -> Optional[str]:
+    row = await session.scalar(select(BotSetting).where(BotSetting.key == key))
+    return row.value if row else None
+
+
+async def set_setting(
+    session: AsyncSession, key: str, value: str, note: str | None = None
+) -> BotSetting:
+    row = await session.scalar(select(BotSetting).where(BotSetting.key == key))
+    if row is None:
+        row = BotSetting(key=key, value=value, note=note)
+        session.add(row)
+    else:
+        row.value = value
+        if note:
+            row.note = note
+        row.updated_at = utcnow()
+    await session.flush()
+    return row
+
+
+async def delete_setting(session: AsyncSession, key: str) -> bool:
+    row = await session.scalar(select(BotSetting).where(BotSetting.key == key))
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.flush()
+    return True
+
+
 # ----------------------------------------------------------- archive rows
 async def add_archived_media(
     session: AsyncSession,
@@ -302,6 +334,9 @@ __all__ = [
     "list_user_ids",
     "get_admin_ids",
     "add_admin",
+    "get_setting",
+    "set_setting",
+    "delete_setting",
     "get_series_by_title",
     "get_series_by_id",
     "get_series_channel",

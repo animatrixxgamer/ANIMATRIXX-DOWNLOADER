@@ -36,6 +36,9 @@ with persistent jobs and crash recovery).
 | **Telegram archive upload** with pre-flight checks and idempotent retries | ✅ |
 | **Temp cleanup after successful archiving** (never deletes active files) | ✅ |
 | Inline keyboards, `/broadcast`, Docker deployment | ✅ |
+| **Unicode font styling** for every heading (bold, italic, fraktur, double-struck, monospace, small caps) | ✅ |
+| **Colourful buttons** - consistent emoji icons on every inline button | ✅ |
+| **Welcome sticker**: `/setsticker` (reply to a sticker), `/sticker`, `/delsticker` | ✅ |
 | Force-subscription, `/genlink`, Local Bot API Server | ⏳ later phases |
 
 ### Commands
@@ -63,6 +66,9 @@ with persistent jobs and crash recovery).
 
 # administration
 /users   /broadcast <text>
+
+# appearance
+/sticker   /setsticker (reply to a sticker)   /delsticker
 ```
 
 `/download` also accepts a **reply to a video/document you own** — the bot
@@ -101,6 +107,30 @@ connect/read timeouts, `MAX_DOWNLOAD_SIZE_MB` enforced while streaming, and the
 payload's **magic bytes** checked before it is accepted (HTML, ZIP, PDF, ELF,
 EXE are rejected). Files are written only inside `TEMP_DIR` and are never
 executed. `ALLOW_PRIVATE_DOWNLOADS=true` exists for local testing only.
+
+---
+
+### Look and feel: fonts, colour, stickers
+
+Telegram's HTML parser has **no colour tags**, so colour and personality come
+from three places instead:
+
+* **Fonts** — every boxed heading is set in a Unicode typeface from
+  `app/utils/fonts.py`: `bold` (default), `bold_sans`, `italic`, `bold_italic`,
+  `fraktur`, `double_struck`, `monospace`, `small_caps`.
+  ```python
+  box("ANIMATRIXX ANIME")            # ╭━「 𝐀𝐍𝐈𝐌𝐀𝐓𝐑𝐈𝐗𝐗 𝐀𝐍𝐈𝐌𝐄 」━━╮
+  box("QUEUE", font=None)            # plain ASCII when you want it
+  stylize("Solo Leveling", "double_struck")
+  ```
+* **Buttons** — Telegram owns button styling, so buttons cannot carry coloured
+  text. Every button therefore starts with a consistent emoji icon
+  (`🎬 title`, `◀️ Prev`, `▶️ Next`, `📚 Find in Library`, `✅ Confirm`,
+  `🛑 Cancel`, `❎ Close`), which is where the colour shows up.
+* **Stickers** — reply to any sticker with `/setsticker` (admin) to save it as
+  the welcome sticker; the bot sends it on every `/start`. `/sticker` replays
+  it, `/delsticker` removes it. It is stored in the `bot_settings` table, and a
+  deleted sticker set never breaks `/start`.
 
 ---
 

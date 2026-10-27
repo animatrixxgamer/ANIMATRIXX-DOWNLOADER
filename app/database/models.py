@@ -230,6 +230,18 @@ class JobEvent(Base):
     job: Mapped[MediaJob] = relationship(back_populates="events")
 
 
+class BotSetting(Base):
+    """Small key/value store for bot appearance and behaviour (stickers, fonts)."""
+
+    __tablename__ = "bot_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    value: Mapped[str] = mapped_column(Text)
+    note: Mapped[Optional[str]] = mapped_column(String(255))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 __all__ = [
     "Base",
     "User",
@@ -239,5 +251,6 @@ __all__ = [
     "ArchivedMedia",
     "MediaJob",
     "JobEvent",
+    "BotSetting",
     "utcnow",
 ]

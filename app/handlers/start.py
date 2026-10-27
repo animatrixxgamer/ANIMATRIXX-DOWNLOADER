@@ -6,14 +6,18 @@ import logging
 
 from telegram import Update
 from telegram.constants import ParseMode
+from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from app import APP_NAME, BRAND, __version__
 from app.database import repositories as repo
 from app.database.session import session_scope
+from app.services.permissions import admin_only
 from app.utils.formatting import box, esc, footer
 
 logger = logging.getLogger(__name__)
+
+STICKER_KEY = "welcome_sticker"
 
 HELP_TEXT = """{header}
 <b>Search</b>
@@ -35,6 +39,11 @@ HELP_TEXT = """{header}
   /archiveinfo      - archive channel status
   /verifyarchive    - check bot access to every channel
 
+<b>Appearance</b>
+  /sticker           - the saved welcome sticker
+  /setsticker        - reply to a sticker to save it (admin)
+  /delsticker        - remove the saved sticker (admin)
+
 <b>General</b>
   /help             - this message
   /storage          - VPS storage overview
@@ -45,6 +54,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     settings = context.bot_data["settings"]
     user = update.effective_user
     factory = context.bot_data["session_factory"]
+    sticker_id = None
     try:
         async with session_scope(factory) as session:
             await repo.upsert_user(
@@ -54,8 +64,16 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 first_name=user.first_name,
                 last_name=user.last_name,
             )
+            sticker_id = await repo.get_setting(session, STICKER_KEY)
     except Exception:  # pragma: no cover - startup must not crash on a write
         logger.exception("Could not persist user %s", user.id)
+
+    if sticker_id:
+        try:
+            await update.effective_message.reply_sticker(sticker_id)
+        except TelegramError as exc:
+            # A sticker set that was deleted upstream must not break /start.
+            logger.info("Welcome sticker could not be sent: %s", exc)
 
     text = (
         f"{box('ANIMATRIXX ANIME')}\n\n"
@@ -105,4 +123,71 @@ async def cmd_storage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
-__all__ = ["cmd_start", "cmd_help", "cmd_storage"]
+@admin_only
+async def cmd_setsticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Save the sticker the command is replying to as the welcome sticker."""
+    message = update.effective_message
+    reply = message.reply_to_message
+    sticker = getattr(reply, "sticker", None) if reply else None
+    if sticker is None:
+        await message.reply_text(
+            "Reply to a sticker with <code>/setsticker</code> to make it the "
+            "welcome sticker the bot sends on /start.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+    factory = context.bot_data["session_factory"]
+    async with session_scope(factory) as session:
+        await repo.set_setting(
+            session,
+            STICKER_KEY,
+            sticker.file_id,
+            note=f"set by {update.effective_user.id}",
+        )
+    await message.reply_text(
+        f"{box('WELCOME STICKER')}\n\n"
+        "  🎨 Saved. The bot will send it on every /start.\n"
+        f"  Remove it with /delsticker\n{footer}",
+        parse_mode=ParseMode.HTML,
+    )
+
+
+@admin_only
+async def cmd_delsticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    factory = context.bot_data["session_factory"]
+    async with session_scope(factory) as session:
+        removed = await repo.delete_setting(session, STICKER_KEY)
+    await update.effective_message.reply_text(
+        "🧹 Welcome sticker removed." if removed else "There is no saved welcome sticker."
+    )
+
+
+async def cmd_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    factory = context.bot_data["session_factory"]
+    async with session_scope(factory) as session:
+        sticker_id = await repo.get_setting(session, STICKER_KEY)
+    if not sticker_id:
+        await update.effective_message.reply_text(
+            "No welcome sticker saved yet. An admin can reply to a sticker "
+            "with /setsticker."
+        )
+        return
+    try:
+        await update.effective_message.reply_sticker(sticker_id)
+    except TelegramError as exc:
+        logger.info("Saved sticker could not be sent: %s", exc)
+        await update.effective_message.reply_text(
+            "⚠️ The saved sticker is no longer available - ask an admin to set "
+            "a new one with /setsticker."
+        )
+
+
+__all__ = [
+    "cmd_start",
+    "cmd_help",
+    "cmd_storage",
+    "cmd_setsticker",
+    "cmd_delsticker",
+    "cmd_sticker",
+    "STICKER_KEY",
+]

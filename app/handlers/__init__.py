@@ -79,6 +79,9 @@ def build_handlers() -> list[BaseHandler]:
         CommandHandler("start", start.cmd_start),
         CommandHandler("help", start.cmd_help),
         CommandHandler("storage", start.cmd_storage),
+        CommandHandler("sticker", start.cmd_sticker),
+        CommandHandler("setsticker", start.cmd_setsticker),
+        CommandHandler("delsticker", start.cmd_delsticker),
         CommandHandler("whoami", admin.cmd_whoami),
         # search
         CommandHandler("search", search.cmd_search),

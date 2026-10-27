@@ -5,6 +5,8 @@ from __future__ import annotations
 import html
 from datetime import datetime, timedelta
 
+from app.utils.fonts import DEFAULT_FONT, stylize
+
 BOX_WIDTH = 30
 
 
@@ -13,9 +15,15 @@ def esc(value: object) -> str:
     return html.escape(str(value if value is not None else ""), quote=False)
 
 
-def box(title: str) -> str:
-    """``╭━━━「 TITLE 」━━━╮`` style heading."""
-    inner = f"「 {title} 」"
+def box(title: str, font: str | None = DEFAULT_FONT) -> str:
+    """``╭━━━「 TITLE 」━━━╮`` heading, set in a Unicode typeface.
+
+    Telegram has no colour tags, so headings get their personality from the
+    typeface (and their colour from the emoji used elsewhere in the message).
+    Pass ``font=None`` for plain ASCII titles.
+    """
+    styled = stylize(title, font) if font else title
+    inner = f"「 {styled} 」"
     pad = max(3, BOX_WIDTH - len(inner))
     left = (pad // 2) * "━"
     right = (pad - pad // 2) * "━"
@@ -79,4 +87,6 @@ __all__ = [
     "format_duration",
     "format_dt",
     "kv",
+    "stylize",
+    "DEFAULT_FONT",
 ]
