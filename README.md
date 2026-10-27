@@ -39,7 +39,9 @@ with persistent jobs and crash recovery).
 | **Unicode font styling** for every heading (bold, italic, fraktur, double-struck, monospace, small caps) | ✅ |
 | **Colourful buttons** - consistent emoji icons on every inline button | ✅ |
 | **Welcome sticker**: `/setsticker` (reply to a sticker), `/sticker`, `/delsticker` | ✅ |
-| Force-subscription, `/genlink`, Local Bot API Server | ⏳ later phases |
+| **Local Bot API Server wiring** (`base_url` + `base_file_url`) for ~2 GB uploads | ✅ |
+| **GitHub Actions CI** (pytest on 3.11/3.12 with FFmpeg, no secrets) | ✅ |
+| Force-subscription, `/genlink` | ⏳ later phases |
 
 ### Commands
 
@@ -251,26 +253,46 @@ restarts after crashes (the queue itself recovers interrupted jobs).
 
 ---
 
-## 10. Large-file uploads (read this before archiving big episodes)
+## 10. Large-file uploads (Local Bot API Server)
 
-The **hosted Telegram Bot API caps bot uploads far below multi-hundred-MB
-anime files** — the bot refuses anything above `TELEGRAM_UPLOAD_LIMIT_MB`
-(49 MB by default) with an explicit message instead of failing mid-upload.
+The **hosted Telegram Bot API caps bot uploads near 50 MB** — far below a
+multi-hundred-MB episode. The bot therefore refuses anything above
+`TELEGRAM_UPLOAD_LIMIT_MB` (49 MB by default) with an explicit message instead
+of failing halfway through an upload.
 
-For larger files you need a **Local Bot API Server**:
+To lift the ceiling to **~2 GB**, run your own Bot API Server
+(official `tdlib/telegram-bot-api`, packaged by aiogram):
 
-1. Run the official Telegram Bot API server (Docker image or binary), pointed
-   at a large-volume directory.
-2. Set `LOCAL_BOT_API_ENABLED=true` and `LOCAL_BOT_API_MAX_MB` to the limit
-   your deployment supports (up to 2000 MB).
-3. Point the bot's Telegram library at your local server (API base URL) and
-   restart; the check `TELEGRAM_UPLOAD_LIMIT_MB → LOCAL_BOT_API_MAX_MB` then
-   applies automatically.
-4. Budget disk (≥2 GB per large file) and bandwidth; switch back by setting
-   `LOCAL_BOT_API_ENABLED=false`.
+1. Get `api_id` / `api_hash` at <https://my.telegram.org> → *API development
+   tools* (<https://core.telegram.org/api/obtaining_api_id>).
+2. Put them in `.env`: `TELEGRAM_API_ID=…` and `TELEGRAM_API_HASH=…`.
+3. Start the server next to the bot:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.localapi.yml up -d
+   ```
+4. In `.env` switch the bot over:
+   ```dotenv
+   LOCAL_BOT_API_ENABLED=true
+   LOCAL_BOT_API_BASE_URL=http://telegram-bot-api:8081/bot
+   LOCAL_BOT_API_FILE_URL=http://telegram-bot-api:8081/file/bot
+   TELEGRAM_UPLOAD_LIMIT_MB=2000
+   ```
+   (outside Docker: `http://localhost:8081/…`)
+5. `docker compose restart animatrixx` — PTB now sends **both** API calls and
+   file downloads through your server; the pre-flight limit becomes 2000 MB
+   and `UPLOAD_TIMEOUT_SECONDS` (600) governs the push.
 
-A Telegram file ID is **not** a backup: `/verifyarchive` detects messages that
-were deleted or channels the bot lost access to.
+**Reality check:** uploaded files are stored on the server volume
+(`bot-api-data`), so budget disk and bandwidth; a Telegram file ID is **not**
+a backup; switching back is `LOCAL_BOT_API_ENABLED=false` + restart. Your bot
+token never changes.
+
+### Continuous integration
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on every push and PR:
+Python 3.11 + 3.12, installs FFmpeg, byte-compiles the sources, runs the full
+suite (including the end-to-end pipeline test) and verifies `.env.example`
+still loads. **No secrets are required** — every test mocks Telegram.
 
 ---
 

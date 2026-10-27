@@ -139,8 +139,14 @@ async def upload(
     caption: str,
     should_cancel=None,
     retry_after: int = 3,
+    read_timeout: float = 180.0,
+    write_timeout: float = 600.0,
 ) -> UploadOutcome:
-    """Send one document, tolerating Telegram flood control."""
+    """Send one document, tolerating Telegram flood control.
+
+    ``write_timeout`` must be generous: a multi-hundred-MB episode can take
+    minutes to push even to a Local Bot API Server on the same host.
+    """""
     path = Path(path)
     if not path.exists():
         raise UploadError("The file disappeared before the upload finished.", "missing_file", permanent=False)
@@ -161,8 +167,8 @@ async def upload(
                     caption=caption[:1024],
                     parse_mode="HTML",
                     supports_streaming=path.suffix.lower() in {".mp4", ".m4v", ".mov"},
-                    read_timeout=180.0,
-                    write_timeout=180.0,
+                    read_timeout=read_timeout,
+                    write_timeout=write_timeout,
                 )
         except RetryAfter as exc:
             last_error = exc

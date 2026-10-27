@@ -547,6 +547,7 @@ class JobManager:
             path=path,
             caption=caption,
             should_cancel=lambda: snap.id in self._cancel,
+            write_timeout=float(self.settings.upload_timeout_seconds),
         )
         return {
             "archive_chat_id": outcome.chat_id,

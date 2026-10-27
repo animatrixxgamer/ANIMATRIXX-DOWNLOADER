@@ -1,0 +1,42 @@
+# Optional: self-hosted Telegram Bot API Server for LARGE uploads.
+#
+# The hosted Bot API caps bot uploads around 50 MB. This server (official
+# tdlib/telegram-bot-api source, packaged by aiogram) lifts that to ~2 GB.
+#
+#   1. Get api_id / api_hash at https://my.telegram.org -> API development tools
+#      (see https://core.telegram.org/api/obtaining_api_id)
+#   2. Put them in a .env next to this file as TELEGRAM_API_ID / TELEGRAM_API_HASH
+#   3. docker compose -f docker-compose.yml -f docker-compose.localapi.yml up -d
+#   4. In .env set:
+#        LOCAL_BOT_API_ENABLED=true
+#        LOCAL_BOT_API_BASE_URL=http://telegram-bot-api:8081/bot
+#        LOCAL_BOT_API_FILE_URL=http://telegram-bot-api:8081/file/bot
+#        TELEGRAM_UPLOAD_LIMIT_MB=2000
+#      (outside Docker, use http://localhost:8081/... instead)
+#   5. Restart the bot.
+#
+# Switching back: LOCAL_BOT_API_ENABLED=false and restart. Your bot token does
+# not change - the server talks to Telegram on your behalf.
+
+services:
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    container_name: animatrixx-bot-api
+    restart: unless-stopped
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:?set TELEGRAM_API_ID in .env}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:?set TELEGRAM_API_HASH in .env}
+      TELEGRAM_LOCAL: "1"   # allow local file serving (no public domain needed)
+      TELEGRAM_VERBOSITY: 1
+    ports:
+      - "8081:8081"
+    volumes:
+      - bot-api-data:/var/lib/telegram-bot-api   # uploaded files live here
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  bot-api-data:

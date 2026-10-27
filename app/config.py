@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -70,8 +70,12 @@ class Settings(BaseSettings):
     autodel_hours: int = 24
     # Hosted Bot API caps bot uploads well below large anime files.
     telegram_upload_limit_mb: int = 49
+    # Local Bot API Server (tdlib/telegram-bot-api) lifts uploads to ~2 GB.
     local_bot_api_enabled: bool = False
+    local_bot_api_base_url: str = "http://localhost:8081/bot"
+    local_bot_api_file_url: str = "http://localhost:8081/file/bot"
     local_bot_api_max_mb: int = 2000
+    upload_timeout_seconds: int = 600
 
     # --- messaging -------------------------------------------------
     poll_interval_seconds: float = 2.0
@@ -133,6 +137,7 @@ class Settings(BaseSettings):
         "autodel_hours",
         "telegram_upload_limit_mb",
         "local_bot_api_max_mb",
+        "upload_timeout_seconds",
     )
 
     @classmethod
@@ -184,6 +189,30 @@ class Settings(BaseSettings):
     @property
     def allowed_ports(self) -> frozenset[int]:
         return frozenset(int(p) for p in self.allowed_download_ports.split(",") if p.strip())
+
+    @model_validator(mode="after")
+    def _local_api_sane(self) -> "Settings":
+        if not self.local_bot_api_enabled:
+            return self
+        for name, url in (
+            ("LOCAL_BOT_API_BASE_URL", self.local_bot_api_base_url),
+            ("LOCAL_BOT_API_FILE_URL", self.local_bot_api_file_url),
+        ):
+            if not url.startswith(("http://", "https://")):
+                raise ValueError(
+                    f"{name} must be an http(s) URL when LOCAL_BOT_API_ENABLED=true"
+                )
+        if not self.local_bot_api_base_url.rstrip("/").endswith("/bot"):
+            raise ValueError(
+                "LOCAL_BOT_API_BASE_URL must end with /bot "
+                "(e.g. http://telegram-bot-api:8081/bot)"
+            )
+        if not self.local_bot_api_file_url.rstrip("/").endswith("/file/bot"):
+            raise ValueError(
+                "LOCAL_BOT_API_FILE_URL must end with /file/bot "
+                "(e.g. http://telegram-bot-api:8081/file/bot)"
+            )
+        return self
 
     @property
     def upload_limit_mb(self) -> int:

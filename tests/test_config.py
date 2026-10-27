@@ -59,3 +59,48 @@ def test_negative_cache_ttl_rejected():
 def test_tmdb_flag_follows_key():
     assert _settings(tmdb_api_key="").tmdb_enabled is False
     assert _settings(tmdb_api_key="abc123").tmdb_enabled is True
+
+
+# ---------------------------------------------------------- local bot API
+def test_hosted_api_is_the_default():
+    s = _settings()
+    assert s.local_bot_api_enabled is False
+    assert s.upload_limit_mb == 49          # conservative hosted cap
+    assert s.local_bot_api_base_url.endswith("/bot")
+    assert s.local_bot_api_file_url.endswith("/file/bot")
+
+
+def test_local_api_lifts_the_upload_ceiling():
+    s = _settings(local_bot_api_enabled=True)
+    assert s.upload_limit_mb == 2000
+    assert s.upload_timeout_seconds == 600
+
+
+def test_local_api_rejects_non_http_urls():
+    with pytest.raises(ValidationError):
+        _settings(local_bot_api_enabled=True, local_bot_api_base_url="ftp://x/bot")
+
+
+def test_local_api_rejects_wrong_paths():
+    with pytest.raises(ValidationError):
+        _settings(local_bot_api_enabled=True, local_bot_api_base_url="http://x:8081")
+    with pytest.raises(ValidationError):
+        _settings(
+            local_bot_api_enabled=True,
+            local_bot_api_file_url="http://x:8081/bot",
+        )
+
+
+def test_local_api_disabled_ignores_bad_urls():
+    # flipping the flag off must be enough to fall back to hosted Telegram
+    s = _settings(local_bot_api_enabled=False, local_bot_api_base_url="not-a-url")
+    assert s.upload_limit_mb == 49
+
+
+def test_docker_network_urls_are_accepted():
+    s = _settings(
+        local_bot_api_enabled=True,
+        local_bot_api_base_url="http://telegram-bot-api:8081/bot",
+        local_bot_api_file_url="http://telegram-bot-api:8081/file/bot",
+    )
+    assert s.local_bot_api_enabled is True

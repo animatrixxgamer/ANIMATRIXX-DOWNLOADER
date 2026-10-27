@@ -69,13 +69,19 @@ def build_application(settings: Settings) -> Application:
     engine = build_engine(settings.database_url)
     factory = build_session_factory(engine)
 
-    app = (
+    builder = (
         ApplicationBuilder()
         .token(settings.bot_token)
         .post_init(_post_init)
         .post_shutdown(_post_shutdown)
-        .build()
     )
+    if settings.local_bot_api_enabled:
+        # Point both the API and the file-download endpoints at our own
+        # Bot API Server - this is what lifts the ~50 MB upload ceiling.
+        builder = builder.base_url(settings.local_bot_api_base_url)
+        builder = builder.base_file_url(settings.local_bot_api_file_url)
+        logger.info("Using Local Bot API Server at %s", settings.local_bot_api_base_url)
+    app = builder.build()
 
     app.bot_data["settings"] = settings
     app.bot_data["engine"] = engine
