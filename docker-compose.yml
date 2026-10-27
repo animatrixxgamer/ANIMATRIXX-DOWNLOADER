@@ -1,0 +1,24 @@
+services:
+  animatrixx:
+    build: .
+    container_name: animatrixx-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/bot/data        # SQLite database
+      - ./logs:/bot/logs        # rotating logs
+      - animatrixx-temp:/bot/temp  # media scratch space
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////bot/data/animatrixx.db
+      TEMP_DIR: /bot/temp
+      LOG_DIR: /bot/logs
+    # FFmpeg encoding phase: cap CPUs so the bot stays responsive
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "2.0"
+    #       memory: 2g
+
+volumes:
+  animatrixx-temp:

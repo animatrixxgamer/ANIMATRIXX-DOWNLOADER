@@ -1,0 +1,28 @@
+# Secrets & local config
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Runtime data
+data/
+temp/
+logs/
+*.db
+*.db-journal
+*.sqlite3
+
+# Media & caches
+*.mkv
+*.mp4
+*.m4v
+*.part
+*.thumb

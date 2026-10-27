@@ -1,0 +1,6 @@
+"""Animatrixx Anime Bot - application package."""
+
+__version__ = "0.1.0"
+APP_NAME = "Animatrixx Anime Bot"
+SHORT_NAME = "Animatrixx"
+BRAND = "\U0001d50c\U0001d526\U0001d522\U0001d52b\U0001d526\U0001d520\U0001d52c\U0001d52c \U0001d513\U0001d527\U0001d520\U0001d526\U0001d51e\U0001d522\U0001d529\U0001d525\u273a"
