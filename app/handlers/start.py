@@ -39,6 +39,12 @@ HELP_TEXT = """{header}
   /archiveinfo      - archive channel status
   /verifyarchive    - check bot access to every channel
 
+<b>Channels (admin)</b>
+  /admin              - the channel menu (buttons)
+  /set_main /get_main /remove_main - the general channel
+  /addchannel [title] - attach an archive channel to a series
+  /listchannels /delchannel /invite /post
+
 <b>Appearance</b>
   /sticker           - the saved welcome sticker
   /setsticker        - reply to a sticker to save it (admin)

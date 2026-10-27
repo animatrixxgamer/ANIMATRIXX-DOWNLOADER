@@ -40,6 +40,8 @@ with persistent jobs and crash recovery).
 | **Colourful buttons** - consistent emoji icons on every inline button | ✅ |
 | **Welcome sticker**: `/setsticker` (reply to a sticker), `/sticker`, `/delsticker` | ✅ |
 | **Local Bot API Server wiring** (`base_url` + `base_file_url`) for ~2 GB uploads | ✅ |
+| **Admin channel menu** (`/admin`): general channel, archive mapping, verify, invite, posts | ✅ |
+| **General channel** (`/set_main`, `/post`, `/invite`) kept separate from archive channels | ✅ |
 | **GitHub Actions CI** (pytest on 3.11/3.12 with FFmpeg, no secrets) | ✅ |
 | Force-subscription, `/genlink` | ⏳ later phases |
 
@@ -68,6 +70,11 @@ with persistent jobs and crash recovery).
 
 # administration
 /users   /broadcast <text>
+
+# channel management (admin menu with buttons)
+/admin              # or /menu - general channel, archive mapping, verify, posts
+/set_main  /get_main  /remove_main
+/addchannel [title]  /listchannels  /delchannel <@name|id>  /invite  /post <text>
 
 # appearance
 /sticker   /setsticker (reply to a sticker)   /delsticker
@@ -208,15 +215,36 @@ See [.env.example](.env.example) — it loads as-is (verified). Highlights:
 3. Get your numeric id from **@userinfobot** → `OWNER_ID=…`.
 4. Restart the bot after changing `.env`.
 
-## 7. Creating and mapping private archive channels
+## 7. Channels: general + per-series archive
 
-1. Telegram → **New Channel** → *Private* → e.g. `Solo Leveling Archive`.
+Two kinds of channel exist, deliberately separate:
+
+| Channel | Purpose | Commands |
+|---|---|---|
+| **General** | announcements and normal posts (one only) | `/set_main`, `/get_main`, `/remove_main`, `/invite`, `/post` |
+| **Archive** | one private channel per series, where episodes are stored | `/addchannel`, `/addseries`, `/delchannel`, `/verifyarchive` |
+
+**`/admin`** opens the menu: 📌 General channel · ➕ Add archive channel ·
+📋 List channels · 🔎 Verify access · ✉️ Post to general · 🧹 Remove a mapping.
+Each button edits one message; the *next* message you send is captured (forward
+the channel's message or send `@name` / `-100…` id), the bot **verifies it can
+post there**, then saves it. `/cancel` aborts at any point.
+
+Setting up a channel:
+
+1. Telegram → **New Channel** → *Private* → name it.
 2. Channel → **Administrators** → **Add Admin** → your bot → allow *posting*.
-3. In the bot: `/addseries anime Solo Leveling`.
-4. When asked, **forward a message from that channel** to the bot (or send
-   `@channelname` / the `-100…` chat id). The bot verifies it can post there.
-5. `/verifyarchive` re-checks every channel; `/delseries` removes only the
-   database mapping — never the channel or its files.
+3. In the bot: `/admin` → 📌 General channel (or ➕ Add archive channel),
+   then **forward a message from that channel** to the bot.
+4. `/invite` mints an invite link (private channels have no public post links);
+   🔎 Verify access re-checks every channel after you change admins.
+
+`/delchannel` and `/delseries` only remove the **database mapping** — the
+Telegram channel and its files are never touched.
+
+`/addseries` still works end to end (title → channel in one conversation) -
+use it when the series does not exist yet, or `/addchannel <title>` when it
+does. `/verifyarchive` re-checks every archive channel on demand.
 
 ---
 

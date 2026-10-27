@@ -13,6 +13,7 @@ from app.database.models import (
     ArchiveChannel,
     ArchivedMedia,
     BotSetting,
+    ChannelConfig,
     Series,
     User,
     utcnow,
@@ -202,6 +203,14 @@ async def get_channel_by_id(session: AsyncSession, channel_id: int) -> Optional[
     return await session.get(ArchiveChannel, channel_id)
 
 
+async def get_channel_by_chat(
+    session: AsyncSession, chat_id: int
+) -> Optional[ArchiveChannel]:
+    return await session.scalar(
+        select(ArchiveChannel).where(ArchiveChannel.telegram_chat_id == chat_id)
+    )
+
+
 async def list_channels(session: AsyncSession) -> Sequence[ArchiveChannel]:
     return (await session.scalars(select(ArchiveChannel).order_by(ArchiveChannel.title))).all()
 
@@ -235,6 +244,71 @@ async def delete_setting(session: AsyncSession, key: str) -> bool:
     await session.delete(row)
     await session.flush()
     return True
+
+
+# --------------------------------------------------------- channel config
+async def get_channel_config(
+    session: AsyncSession, role: str, chat_id: int | None = None
+) -> Optional[ChannelConfig]:
+    stmt = select(ChannelConfig).where(ChannelConfig.role == role)
+    if chat_id is not None:
+        stmt = stmt.where(ChannelConfig.telegram_chat_id == chat_id)
+    return await session.scalar(stmt)
+
+
+async def set_channel_config(
+    session: AsyncSession,
+    role: str,
+    chat_id: int,
+    *,
+    title: str | None = None,
+    username: str | None = None,
+    invite_link: str | None = None,
+    single: bool = False,
+) -> ChannelConfig:
+    """Create or update a channel. ``single=True`` keeps one row per role
+    (the general channel), replacing whatever was there before.
+    """
+    if single:
+        existing = await session.scalar(select(ChannelConfig).where(ChannelConfig.role == role))
+        if existing is not None and existing.telegram_chat_id != chat_id:
+            await session.delete(existing)
+            await session.flush()
+    row = await get_channel_config(session, role, chat_id)
+    if row is None:
+        row = ChannelConfig(role=role, telegram_chat_id=chat_id)
+        session.add(row)
+    if title:
+        row.title = title
+    if username:
+        row.username = username
+    if invite_link:
+        row.invite_link = invite_link
+    row.status = "active"
+    row.verified_at = utcnow()
+    await session.flush()
+    return row
+
+
+async def list_channel_configs(session: AsyncSession, role: str | None = None) -> Sequence[ChannelConfig]:
+    stmt = select(ChannelConfig).order_by(ChannelConfig.role, ChannelConfig.title)
+    if role:
+        stmt = stmt.where(ChannelConfig.role == role)
+    return (await session.scalars(stmt)).all()
+
+
+async def delete_channel_config(
+    session: AsyncSession, role: str, chat_id: int | None = None
+) -> int:
+    stmt = select(ChannelConfig).where(ChannelConfig.role == role)
+    if chat_id is not None:
+        stmt = stmt.where(ChannelConfig.telegram_chat_id == chat_id)
+    removed = 0
+    for row in (await session.scalars(stmt)).all():
+        await session.delete(row)
+        removed += 1
+    await session.flush()
+    return removed
 
 
 # ----------------------------------------------------------- archive rows
@@ -337,6 +411,10 @@ __all__ = [
     "get_setting",
     "set_setting",
     "delete_setting",
+    "get_channel_config",
+    "set_channel_config",
+    "list_channel_configs",
+    "delete_channel_config",
     "get_series_by_title",
     "get_series_by_id",
     "get_series_channel",
@@ -348,6 +426,7 @@ __all__ = [
     "attach_archive_channel",
     "get_or_create_channel",
     "get_channel_by_id",
+    "get_channel_by_chat",
     "list_channels",
     "add_archived_media",
     "search_archive",

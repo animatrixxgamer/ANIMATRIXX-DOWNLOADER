@@ -230,6 +230,31 @@ class JobEvent(Base):
     job: Mapped[MediaJob] = relationship(back_populates="events")
 
 
+class ChannelConfig(Base):
+    """Channel configuration outside the per-series mapping.
+
+    ``role='main'`` is the general channel for announcements and normal posts
+    (exactly one row); ``role='fsub'`` rows are reserved for the later
+    force-subscription phase.
+    """
+
+    __tablename__ = "channel_config"
+    __table_args__ = (
+        UniqueConstraint("role", "telegram_chat_id", name="uq_channel_role_chat"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255))
+    username: Mapped[Optional[str]] = mapped_column(String(128))
+    invite_link: Mapped[Optional[str]] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), default="active")  # active | missing | denied
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 class BotSetting(Base):
     """Small key/value store for bot appearance and behaviour (stickers, fonts)."""
 
@@ -252,5 +277,6 @@ __all__ = [
     "MediaJob",
     "JobEvent",
     "BotSetting",
+    "ChannelConfig",
     "utcnow",
 ]

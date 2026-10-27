@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from app.handlers import admin, callbacks, library, media, search, series, start
+from app.handlers import admin, callbacks, channels, library, media, search, series, start
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ CALLBACK_ROUTES = {
     "del": series.cb_series_delete,
     "libid": series.cb_series_library,
     "cf": series.cb_confirm,
+    "ch": channels.cb_menu,
 }
 
 
@@ -101,6 +102,17 @@ def build_handlers() -> list[BaseHandler]:
         CommandHandler("episode", library.cmd_episode),
         CommandHandler("archiveinfo", library.cmd_archiveinfo),
         CommandHandler("verifyarchive", library.cmd_verifyarchive),
+        # channel management (admin menu)
+        CommandHandler("admin", channels.cmd_menu),
+        CommandHandler("menu", channels.cmd_menu),
+        CommandHandler("set_main", channels.cmd_set_main),
+        CommandHandler("get_main", channels.cmd_get_main),
+        CommandHandler("remove_main", channels.cmd_remove_main),
+        CommandHandler("addchannel", channels.cmd_addchannel),
+        CommandHandler("delchannel", channels.cmd_delchannel),
+        CommandHandler("listchannels", channels.cmd_listchannels),
+        CommandHandler("invite", channels.cmd_invite),
+        CommandHandler("post", channels.cmd_post),
         # admin
         CommandHandler("users", admin.cmd_users),
         CommandHandler("broadcast", admin.cmd_broadcast),
@@ -111,13 +123,17 @@ def build_handlers() -> list[BaseHandler]:
         CommandHandler("profiles", media.cmd_profiles),
         CommandHandler("queue", media.cmd_queue),
         CommandHandler("progress", media.cmd_progress),
-        CommandHandler("cancel", media.cmd_cancel),
         CommandHandler("retry", media.cmd_retry),
         CommandHandler("jobs", media.cmd_jobs),
         CommandHandler("pause", media.cmd_pause),
         CommandHandler("resume", media.cmd_resume),
+        # /cancel aborts whichever flow is open (channel action, else a job)
+        CommandHandler("cancel", channels.cmd_cancel),
         # inline buttons (registered last so command handlers win)
         CallbackQueryHandler(dispatch_callback),
+        # free-text capture for channel flows - deliberately last, so every
+        # command and conversation handler gets the first chance to match
+        MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND, channels.on_channel_message),
     ]
     return handlers
 
