@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from app.handlers import admin, callbacks, library, search, series, start
+from app.handlers import admin, callbacks, library, media, search, series, start
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +101,18 @@ def build_handlers() -> list[BaseHandler]:
         # admin
         CommandHandler("users", admin.cmd_users),
         CommandHandler("broadcast", admin.cmd_broadcast),
+        # media pipeline
+        CommandHandler("download", media.cmd_download),
+        CommandHandler("addlink", media.cmd_addlink),
+        CommandHandler("encode", media.cmd_encode),
+        CommandHandler("profiles", media.cmd_profiles),
+        CommandHandler("queue", media.cmd_queue),
+        CommandHandler("progress", media.cmd_progress),
+        CommandHandler("cancel", media.cmd_cancel),
+        CommandHandler("retry", media.cmd_retry),
+        CommandHandler("jobs", media.cmd_jobs),
+        CommandHandler("pause", media.cmd_pause),
+        CommandHandler("resume", media.cmd_resume),
         # inline buttons (registered last so command handlers win)
         CallbackQueryHandler(dispatch_callback),
     ]

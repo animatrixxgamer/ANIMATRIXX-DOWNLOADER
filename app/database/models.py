@@ -149,6 +149,87 @@ class ArchivedMedia(Base):
     series: Mapped[Series] = relationship(back_populates="episodes")
 
 
+class MediaJob(Base):
+    """One pipeline run: acquire -> encode -> archive -> cleanup.
+
+    The spec lists DownloadJob / EncodingJob / UploadJob separately; a single
+    row per pipeline makes crash recovery far simpler because every stage
+    shares one state, one retry counter and one file path.
+    """
+
+    __tablename__ = "media_jobs"
+    __table_args__ = (
+        Index("ix_jobs_state", "state"),
+        Index("ix_jobs_owner", "owner_telegram_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    state: Mapped[str] = mapped_column(String(24), default="pending", nullable=False)
+    source_type: Mapped[str] = mapped_column(String(24), default="url")  # url | telegram_file
+    source_url: Mapped[Optional[str]] = mapped_column(Text)
+    source_file_id: Mapped[Optional[str]] = mapped_column(Text)
+    source_etag: Mapped[Optional[str]] = mapped_column(String(255))
+    source_size: Mapped[Optional[int]] = mapped_column(BigInteger)
+
+    owner_telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    series_id: Mapped[Optional[int]] = mapped_column(ForeignKey("series.id", ondelete="SET NULL"))
+    season_number: Mapped[int] = mapped_column(Integer, default=1)
+    episode_number: Mapped[Optional[int]] = mapped_column(Integer)
+    episode_title: Mapped[Optional[str]] = mapped_column(String(512))
+
+    filename: Mapped[Optional[str]] = mapped_column(String(512))
+    work_path: Mapped[Optional[str]] = mapped_column(Text)
+    output_path: Mapped[Optional[str]] = mapped_column(Text)
+    profile: Mapped[str] = mapped_column(String(32), default="balanced")
+    resolution: Mapped[Optional[str]] = mapped_column(String(16))
+    output_format: Mapped[Optional[str]] = mapped_column(String(8))
+    target_size_mb: Mapped[Optional[int]] = mapped_column(Integer)
+
+    total_bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
+    done_bytes: Mapped[Optional[int]] = mapped_column(BigInteger, default=0)
+    speed_bps: Mapped[Optional[float]] = mapped_column(Float)
+    percent: Mapped[Optional[float]] = mapped_column(Float)
+    stage_detail: Mapped[Optional[str]] = mapped_column(String(64))
+
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_error: Mapped[Optional[str]] = mapped_column(Text)
+    error_code: Mapped[Optional[str]] = mapped_column(String(64))
+
+    # progress message + archive destination (idempotent upload retries)
+    status_chat_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    status_message_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    archive_chat_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    archive_message_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    archive_file_id: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    series: Mapped[Optional[Series]] = relationship()
+    events: Mapped[list["JobEvent"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+
+
+class JobEvent(Base):
+    """Append-only log of state changes and failures for one job."""
+
+    __tablename__ = "job_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("media_jobs.id", ondelete="CASCADE"), index=True)
+    level: Mapped[str] = mapped_column(String(16), default="info")
+    state: Mapped[Optional[str]] = mapped_column(String(24))
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    job: Mapped[MediaJob] = relationship(back_populates="events")
+
+
 __all__ = [
     "Base",
     "User",
@@ -156,5 +237,7 @@ __all__ = [
     "ArchiveChannel",
     "Series",
     "ArchivedMedia",
+    "MediaJob",
+    "JobEvent",
     "utcnow",
 ]

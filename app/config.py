@@ -38,6 +38,45 @@ class Settings(BaseSettings):
     tmdb_api_key: str = ""
     metadata_cache_ttl: int = 3600
 
+    # --- pipeline: concurrency -------------------------------------
+    max_concurrent_downloads: int = 2
+    max_concurrent_encodings: int = 1
+    max_concurrent_uploads: int = 2
+    max_jobs_per_user: int = 2
+
+    # --- pipeline: download safety ---------------------------------
+    max_download_size_mb: int = 2048
+    min_free_disk_mb: int = 2048
+    download_connect_timeout: float = 15.0
+    download_read_timeout: float = 60.0
+    max_redirects: int = 5
+    allowed_download_ports: str = "80,443"
+    # Development/test only: lets the downloader reach a local HTTP server.
+    allow_private_downloads: bool = False
+
+    # --- pipeline: retries -----------------------------------------
+    max_job_attempts: int = 3
+    retry_backoff_seconds: int = 30
+
+    # --- pipeline: encoding ----------------------------------------
+    default_output_format: str = "mp4"
+    default_encoding_profile: str = "balanced"
+    ffmpeg_binary: str = "ffmpeg"
+    ffprobe_binary: str = "ffprobe"
+    encode_timeout_seconds: int = 3600
+
+    # --- pipeline: storage / upload --------------------------------
+    autodel_enabled: bool = True
+    autodel_hours: int = 24
+    # Hosted Bot API caps bot uploads well below large anime files.
+    telegram_upload_limit_mb: int = 49
+    local_bot_api_enabled: bool = False
+    local_bot_api_max_mb: int = 2000
+
+    # --- messaging -------------------------------------------------
+    poll_interval_seconds: float = 2.0
+    progress_update_interval: float = 2.0
+
     # --- branding ---------------------------------------------------
     bot_username: str = ""
 
@@ -79,6 +118,76 @@ class Settings(BaseSettings):
         if value < 0:
             raise ValueError("METADATA_CACHE_TTL must be >= 0")
         return value
+
+    _positive_ints = (
+        "max_concurrent_downloads",
+        "max_concurrent_encodings",
+        "max_concurrent_uploads",
+        "max_jobs_per_user",
+        "max_download_size_mb",
+        "min_free_disk_mb",
+        "max_redirects",
+        "max_job_attempts",
+        "retry_backoff_seconds",
+        "encode_timeout_seconds",
+        "autodel_hours",
+        "telegram_upload_limit_mb",
+        "local_bot_api_max_mb",
+    )
+
+    @classmethod
+    def _check_positive(cls, name: str, value: int) -> int:
+        if value < 1:
+            raise ValueError(f"{name.upper()} must be >= 1")
+        return value
+
+    @field_validator(*_positive_ints)
+    @classmethod
+    def _positive(cls, value: int, info) -> int:
+        return cls._check_positive(info.field_name, value)
+
+    @field_validator("default_encoding_profile")
+    @classmethod
+    def _profile_known(cls, value: str) -> str:
+        allowed = {"original", "high", "balanced", "small", "target"}
+        value = (value or "").strip().lower()
+        if value not in allowed:
+            raise ValueError(f"DEFAULT_ENCODING_PROFILE must be one of {sorted(allowed)}")
+        return value
+
+    @field_validator("default_output_format")
+    @classmethod
+    def _format_known(cls, value: str) -> str:
+        value = (value or "").strip().lower().lstrip(".")
+        if value not in {"mp4", "mkv"}:
+            raise ValueError("DEFAULT_OUTPUT_FORMAT must be mp4 or mkv")
+        return value
+
+    @field_validator("allowed_download_ports")
+    @classmethod
+    def _ports_sane(cls, value: str) -> str:
+        ports = [p.strip() for p in (value or "").replace(" ", ",").split(",") if p.strip()]
+        if not ports:
+            raise ValueError("ALLOWED_DOWNLOAD_PORTS must list at least one port")
+        for port in ports:
+            if not port.isdigit() or not (1 <= int(port) <= 65535):
+                raise ValueError(f"Invalid port in ALLOWED_DOWNLOAD_PORTS: {port}")
+        return ",".join(ports)
+
+    @field_validator("poll_interval_seconds", "progress_update_interval", "download_connect_timeout", "download_read_timeout")
+    @classmethod
+    def _positive_float(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("timing values must be > 0")
+        return value
+
+    @property
+    def allowed_ports(self) -> frozenset[int]:
+        return frozenset(int(p) for p in self.allowed_download_ports.split(",") if p.strip())
+
+    @property
+    def upload_limit_mb(self) -> int:
+        return self.local_bot_api_max_mb if self.local_bot_api_enabled else self.telegram_upload_limit_mb
 
     # --- derived ----------------------------------------------------
     @property

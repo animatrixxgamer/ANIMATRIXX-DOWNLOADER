@@ -76,6 +76,15 @@ async def get_series_by_title(session: AsyncSession, title: str) -> Optional[Ser
     return await session.scalar(select(Series).where(Series.normalized_title == normalized))
 
 
+async def get_series_channel(
+    session: AsyncSession, series: Optional[Series]
+) -> Optional[ArchiveChannel]:
+    """Fetch the archive channel explicitly - async SQLAlchemy cannot lazy-load."""
+    if series is None or series.archive_channel_id is None:
+        return None
+    return await session.get(ArchiveChannel, series.archive_channel_id)
+
+
 async def get_series_by_id(session: AsyncSession, series_id: int) -> Optional[Series]:
     return await session.get(Series, series_id)
 
@@ -295,6 +304,7 @@ __all__ = [
     "add_admin",
     "get_series_by_title",
     "get_series_by_id",
+    "get_series_channel",
     "find_series",
     "create_series",
     "list_series",

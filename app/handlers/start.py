@@ -74,7 +74,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     header = box("ANIMATRIXX COMMANDS")
     await update.effective_message.reply_text(
-        HELP_TEXT.format(header=header, footer=footer()),
+        HELP_TEXT.format(header=header, footer=footer),
         parse_mode=ParseMode.HTML,
     )
 

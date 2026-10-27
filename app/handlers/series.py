@@ -220,13 +220,13 @@ async def cmd_series(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             found = await repo.find_series(session, title, limit=1)
             series = found[0] if found else None
         episodes = await repo.list_archive_for_series(session, series.id) if series else []
+        channel = await repo.get_series_channel(session, series)
 
     header = box("ANIMATRIXX SERIES")
     if series is None:
         await _ask(update, f"{header}\n\n  No series matches <b>{esc(title)}</b>.\n{footer}")
         return
 
-    channel = series.archive_channel
     text = (
         f"{header}\n\n"
         f"  🎬 <b>{esc(series.title)}</b>\n"

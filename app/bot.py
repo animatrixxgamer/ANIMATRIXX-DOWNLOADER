@@ -14,6 +14,7 @@ from app.handlers import build_handlers, on_error
 from app.services.anime_metadata import AniListClient
 from app.services.movie_metadata import TMDBClient
 from app.services.result_store import ResultStore
+from app.workers.job_manager import JobManager
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,10 @@ async def _post_init(app: Application) -> None:
         db_admins = set()
     app.bot_data["db_admin_ids"] = frozenset(db_admins)
 
+    manager = app.bot_data.get("job_manager")
+    if manager is not None:
+        await manager.start()  # crash recovery + persistent queue
+
     try:
         me = await app.bot.get_me()
         app.bot_data["settings"].bot_username = me.username or ""
@@ -48,6 +53,9 @@ async def _post_init(app: Application) -> None:
 
 
 async def _post_shutdown(app: Application) -> None:
+    manager: JobManager | None = app.bot_data.get("job_manager")
+    if manager is not None:
+        await manager.stop()
     await app.bot_data["anilist"].aclose()
     await app.bot_data["tmdb"].aclose()
     engine = app.bot_data.get("engine")
@@ -76,6 +84,9 @@ def build_application(settings: Settings) -> Application:
     app.bot_data["tmdb"] = TMDBClient(settings.tmdb_api_key, cache_ttl=settings.metadata_cache_ttl)
     app.bot_data["results"] = ResultStore()
     app.bot_data["db_admin_ids"] = frozenset(settings.administrators)
+
+    manager = JobManager(app)
+    app.bot_data["job_manager"] = manager
 
     for handler in build_handlers():
         app.add_handler(handler)

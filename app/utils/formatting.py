@@ -22,8 +22,9 @@ def box(title: str) -> str:
     return f"╭{left}{inner}{right}╮"
 
 
-def footer() -> str:
-    return "╰" + "━" * (BOX_WIDTH + 4) + "╯"
+# A constant, not a function: messages interpolate it and pass it straight
+# into "\n".join(...), where a callable would blow up at send time.
+footer: str = "╰" + "━" * (BOX_WIDTH + 4) + "╯"
 
 
 def progress_bar(percent: float, width: int = 10) -> str:
